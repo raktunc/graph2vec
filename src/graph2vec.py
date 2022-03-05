@@ -1,9 +1,11 @@
 """Graph2Vec module."""
 
 import os
-import json
 import glob
 import hashlib
+
+import numpy
+import numpy as np
 import pandas as pd
 import networkx as nx
 from tqdm import tqdm
@@ -109,6 +111,8 @@ def save_embedding(output_path, model, files, dimensions):
     out = pd.DataFrame(out, columns=column_names)
     out = out.sort_values(["timeStep"])
     out.to_csv(output_path, index=None)
+    out.drop("timeStep", inplace=True, axis=1)
+    return out
 
 def main(args):
     """
@@ -132,7 +136,17 @@ def main(args):
                     epochs=args.epochs,
                     alpha=args.learning_rate)
 
-    save_embedding(args.output_path, model, graphs, args.dimensions)
+    vectors = save_embedding(args.output_path, model, graphs, args.dimensions).values.tolist()
+    dists = []
+    i = 0
+    while i < len(vectors)-1:
+        dist = numpy.linalg.norm(np.array(vectors[i+1])-np.array(vectors[i]))
+        dists.append(dist)
+        i += 1
+
+    print(dists)
+
+
 
 if __name__ == "__main__":
     args = parameter_parser()
