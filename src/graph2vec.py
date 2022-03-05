@@ -66,15 +66,18 @@ def dataset_reader(path):
     :return name: Name of the graph.
     """
     name = path2name(path)
-    data = json.load(open(path))
-    graph = nx.from_edgelist(data["edges"])
 
-    if "features" in data.keys():
-        features = data["features"]
-        features = {int(k): v for k, v in features.items()}
-    else:
-        features = nx.degree(graph)
-        features = {int(k): v for k, v in features}
+    edgelist = []
+    with open(path) as f:
+        for line in f:
+            edge = line.split()
+            del edge[2]
+            edgelist.append([int(node) for node in edge])
+
+    graph = nx.from_edgelist(edgelist, nx.DiGraph)
+
+    features = nx.degree(graph)
+    features = {int(k): v for k, v in features}
        
     return graph, features, name
 
@@ -101,10 +104,10 @@ def save_embedding(output_path, model, files, dimensions):
     out = []
     for f in files:
         identifier = path2name(f)
-        out.append([identifier] + list(model.docvecs["g_"+identifier]))
-    column_names = ["type"]+["x_"+str(dim) for dim in range(dimensions)]
+        out.append([int(identifier)] + list(model.dv["g_"+identifier]))
+    column_names = ["timeStep"]+["x_"+str(dim) for dim in range(dimensions)]
     out = pd.DataFrame(out, columns=column_names)
-    out = out.sort_values(["type"])
+    out = out.sort_values(["timeStep"])
     out.to_csv(output_path, index=None)
 
 def main(args):
@@ -113,7 +116,8 @@ def main(args):
     Learn the embedding and save it.
     :param args: Object with the arguments.
     """
-    graphs = glob.glob(os.path.join(args.input_path, "*.json"))
+    graphs = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
+    graphs.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
     print("\nFeature extraction started.\n")
     document_collections = Parallel(n_jobs=args.workers)(delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
     print("\nOptimization started.\n")
