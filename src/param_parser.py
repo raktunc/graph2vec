@@ -28,8 +28,8 @@ def parameter_parser():
 
     parser.add_argument("--workers",
                         type=int,
-                        default=4,
-	                help="Number of workers. Default is 4.")
+                        default=6,
+	                help="Number of workers. Default is 6.")
 
     parser.add_argument("--epochs",
                         type=int,

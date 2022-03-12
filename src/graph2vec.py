@@ -12,6 +12,8 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 from param_parser import parameter_parser
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+from scipy import spatial
+import time
 
 class WeisfeilerLehmanMachine:
     """
@@ -123,10 +125,14 @@ def main(args):
     """
     graphs = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
     graphs.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
-    print("\nFeature extraction started.\n")
-    document_collections = Parallel(n_jobs=args.workers)(delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
-    print("\nOptimization started.\n")
 
+    print("\nFeature extraction started.\n")
+    start_time = time.time()
+    document_collections = Parallel(n_jobs=args.workers)(delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
+    print("\nFeature extraction completed in %s seconds\n" % (time.time() - start_time))
+
+    print("\nOptimization started.\n")
+    start_time = time.time()
     model = Doc2Vec(document_collections,
                     vector_size=args.dimensions,
                     window=0,
@@ -136,18 +142,27 @@ def main(args):
                     workers=args.workers,
                     epochs=args.epochs,
                     alpha=args.learning_rate)
+    print("\nOptimization completed in %s seconds\n" % (time.time() - start_time))
 
     vectors = save_embedding(args.output_path + "/vectors.csv", model, graphs, args.dimensions).values.tolist()
-    dists = []
+
+    print("\nDistance computation started.\n")
+    start_time = time.time()
+    computeDistances(vectors, args.output_path + "/dists.csv")
+    print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
+
+def computeDistances(vectors, output_path):
+    euclidian = []
+    cosine = []
     i = 0
-    while i < len(vectors)-1:
-        dist = numpy.linalg.norm(np.array(vectors[i+1])-np.array(vectors[i]))
-        dists.append(dist)
+    while i < len(vectors) - 1:
+        euclidian.append(numpy.linalg.norm(np.array(vectors[i]) - np.array(vectors[i+1])))
+        cosine.append(spatial.distance.cosine(np.array(vectors[i]), np.array(vectors[i+1])))
         i += 1
-
-    df = pd.DataFrame(dists)
-    df.to_csv(args.output_path + "/dists.csv")
-
+    df = pd.DataFrame({'euclidian': euclidian,
+                       'cosine': cosine
+                       })
+    df.to_csv(output_path)
 
 
 if __name__ == "__main__":
