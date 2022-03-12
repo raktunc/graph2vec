@@ -123,6 +123,8 @@ def main(args):
     Learn the embedding and save it.
     :param args: Object with the arguments.
     """
+    process_start_time = time.time()
+
     graphs = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
     graphs.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
 
@@ -151,13 +153,15 @@ def main(args):
     computeDistances(vectors, args.output_path + "/dists.csv")
     print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
 
+    print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
+
 def computeDistances(vectors, output_path):
     euclidian = []
     cosine = []
-    i = 0
-    while i < len(vectors) - 1:
-        euclidian.append(numpy.linalg.norm(np.array(vectors[i]) - np.array(vectors[i+1])))
-        cosine.append(spatial.distance.cosine(np.array(vectors[i]), np.array(vectors[i+1])))
+    i = 1
+    while i < len(vectors):
+        euclidian.append(numpy.linalg.norm(np.array(vectors[i]) - np.array(vectors[0])))
+        cosine.append(spatial.distance.cosine(np.array(vectors[i]), np.array(vectors[0])))
         i += 1
     df = pd.DataFrame({'euclidian': euclidian,
                        'cosine': cosine
