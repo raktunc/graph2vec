@@ -4,21 +4,24 @@ import os
 import glob
 import hashlib
 
-import numpy
 import numpy as np
 import pandas as pd
 import networkx as nx
+from numpy.linalg import LinAlgError
+from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, braycurtis, canberra, chebyshev, \
+    cityblock, correlation
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from param_parser import parameter_parser
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-from scipy import spatial
 import time
+
 
 class WeisfeilerLehmanMachine:
     """
     Weisfeiler Lehman feature extractor class.
     """
+
     def __init__(self, graph, features, iterations):
         """
         Initialization method which also executes feature extraction.
@@ -42,7 +45,7 @@ class WeisfeilerLehmanMachine:
         for node in self.nodes:
             nebs = self.graph.neighbors(node)
             degs = [self.features[neb] for neb in nebs]
-            features = [str(self.features[node])]+sorted([str(deg) for deg in degs])
+            features = [str(self.features[node])] + sorted([str(deg) for deg in degs])
             features = "_".join(features)
             hash_object = hashlib.md5(features.encode())
             hashing = hash_object.hexdigest()
@@ -57,9 +60,11 @@ class WeisfeilerLehmanMachine:
         for _ in range(self.iterations):
             self.features = self.do_a_recursion()
 
+
 def path2name(path):
     base = os.path.basename(path)
     return os.path.splitext(base)[0]
+
 
 def dataset_reader(path):
     """
@@ -83,8 +88,9 @@ def dataset_reader(path):
 
     features = nx.degree(graph)
     features = {int(k): v for k, v in features}
-       
+
     return graph, features, name
+
 
 def feature_extractor(path, rounds):
     """
@@ -98,6 +104,7 @@ def feature_extractor(path, rounds):
     doc = TaggedDocument(words=machine.extracted_features, tags=["g_" + name])
     return doc
 
+
 def save_embedding(output_path, model, files, dimensions):
     """
     Function to save the embedding.
@@ -109,13 +116,14 @@ def save_embedding(output_path, model, files, dimensions):
     out = []
     for f in files:
         identifier = path2name(f)
-        out.append([int(identifier)] + list(model.dv["g_"+identifier]))
-    column_names = ["timeStep"]+["x_"+str(dim) for dim in range(dimensions)]
+        out.append([int(identifier)] + list(model.dv["g_" + identifier]))
+    column_names = ["timeStep"] + ["x_" + str(dim) for dim in range(dimensions)]
     out = pd.DataFrame(out, columns=column_names)
     out = out.sort_values(["timeStep"])
     out.to_csv(output_path, index=None)
     out.drop("timeStep", inplace=True, axis=1)
     return out
+
 
 def main(args):
     """
@@ -130,7 +138,8 @@ def main(args):
 
     print("\nFeature extraction started.\n")
     start_time = time.time()
-    document_collections = Parallel(n_jobs=args.workers)(delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
+    document_collections = Parallel(n_jobs=args.workers)(
+        delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
     print("\nFeature extraction completed in %s seconds\n" % (time.time() - start_time))
 
     print("\nOptimization started.\n")
@@ -150,23 +159,83 @@ def main(args):
 
     print("\nDistance computation started.\n")
     start_time = time.time()
-    computeDistances(vectors, args.output_path + "/dists.csv")
+    compute_distances_to_initial(vectors, args.output_path + "/distsToInitial.csv")
+    compute_distances_to_mean(vectors, args.output_path + "/distsToMean.csv")
     print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
 
     print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
 
-def computeDistances(vectors, output_path):
-    euclidian = []
-    cosine = []
+
+def compute_distances_to_initial(vectors, output_path):
+    df = pd.DataFrame(vectors)
+    inv_cov = np.linalg.inv(df.cov())
+    euclidian_dists = []
+    cosine_dists = []
+    minkowski_dists = []
+    mahalanobis_dists = []
+    braycurtis_dists = []
+    canberra_dists = []
+    chebyshev_dists = []
+    cityblock_dists = []
+    correlation_dists = []
     i = 1
     while i < len(vectors):
-        euclidian.append(numpy.linalg.norm(np.array(vectors[i]) - np.array(vectors[0])))
-        cosine.append(spatial.distance.cosine(np.array(vectors[i]), np.array(vectors[0])))
+        euclidian_dists.append(euclidean(np.array(vectors[i]), np.array(vectors[0])))
+        cosine_dists.append(cosine(np.array(vectors[i]), np.array(vectors[0])))
+        minkowski_dists.append(minkowski(np.array(vectors[i]), np.array(vectors[0])))
+        mahalanobis_dists.append(mahalanobis(np.array(vectors[i]), np.array(vectors[0]), inv_cov))
+        braycurtis_dists.append(braycurtis(np.array(vectors[i]), np.array(vectors[0])))
+        canberra_dists.append(canberra(np.array(vectors[i]), np.array(vectors[0])))
+        chebyshev_dists.append(chebyshev(np.array(vectors[i]), np.array(vectors[0])))
+        cityblock_dists.append(cityblock(np.array(vectors[i]), np.array(vectors[0])))
+        correlation_dists.append(correlation(np.array(vectors[i]), np.array(vectors[0])))
         i += 1
-    df = pd.DataFrame({'euclidian': euclidian,
-                       'cosine': cosine
-                       })
-    df.to_csv(output_path)
+    pd.DataFrame({'euclidian': euclidian_dists,
+                  'cosine': cosine_dists,
+                  'minkowski': minkowski_dists,
+                  'mahalanobis': mahalanobis_dists,
+                  'braycurtis': braycurtis_dists,
+                  'canberra': canberra_dists,
+                  'chebyshev': chebyshev_dists,
+                  'cityblock': cityblock_dists,
+                  'correlation': correlation_dists
+                  }).to_csv(output_path, index=False)
+
+
+def compute_distances_to_mean(vectors, output_path):
+    del vectors[0]  # delete the initial networks vector
+    df = pd.DataFrame(vectors)
+    inv_cov = np.linalg.inv(df.cov())
+    means = df.mean()
+    euclidian_dists = []
+    cosine_dists = []
+    minkowski_dists = []
+    mahalanobis_dists = []
+    braycurtis_dists = []
+    canberra_dists = []
+    chebyshev_dists = []
+    cityblock_dists = []
+    correlation_dists = []
+    for i, sample in df.iterrows():
+        euclidian_dists.append(euclidean(sample, means))
+        cosine_dists.append(cosine(sample, means))
+        minkowski_dists.append(minkowski(sample, means))
+        mahalanobis_dists.append(mahalanobis(sample, means, inv_cov))
+        braycurtis_dists.append(braycurtis(sample, means))
+        canberra_dists.append(canberra(sample, means))
+        chebyshev_dists.append(chebyshev(sample, means))
+        cityblock_dists.append(cityblock(sample, means))
+        correlation_dists.append(correlation(sample, means))
+    pd.DataFrame({'euclidian': euclidian_dists,
+                  'cosine': cosine_dists,
+                  'minkowski': minkowski_dists,
+                  'mahalanobis': mahalanobis_dists,
+                  'braycurtis': braycurtis_dists,
+                  'canberra': canberra_dists,
+                  'chebyshev': chebyshev_dists,
+                  'cityblock': cityblock_dists,
+                  'correlation': correlation_dists
+                  }).to_csv(output_path, index=False)
 
 
 if __name__ == "__main__":
