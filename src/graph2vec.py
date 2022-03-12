@@ -73,7 +73,8 @@ def dataset_reader(path):
     with open(path) as f:
         for line in f:
             edge = line.split()
-            del edge[2]
+            if len(edge) > 2:
+                del edge[2]
             edgelist.append([int(node) for node in edge])
 
     graph = nx.from_edgelist(edgelist, nx.DiGraph)
@@ -136,7 +137,7 @@ def main(args):
                     epochs=args.epochs,
                     alpha=args.learning_rate)
 
-    vectors = save_embedding(args.output_path, model, graphs, args.dimensions).values.tolist()
+    vectors = save_embedding(args.output_path + "/vectors.csv", model, graphs, args.dimensions).values.tolist()
     dists = []
     i = 0
     while i < len(vectors)-1:
@@ -144,7 +145,8 @@ def main(args):
         dists.append(dist)
         i += 1
 
-    print(dists)
+    df = pd.DataFrame(dists)
+    df.to_csv(args.output_path + "/dists.csv")
 
 
 
