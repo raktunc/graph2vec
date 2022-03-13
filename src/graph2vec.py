@@ -1,5 +1,5 @@
 """Graph2Vec module."""
-
+import ast
 import os
 import glob
 import hashlib
@@ -136,13 +136,13 @@ def main(args):
     graphs = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
     graphs.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
 
-    print("\nFeature extraction started.\n")
+    #  print("\nFeature extraction started.\n")
     start_time = time.time()
     document_collections = Parallel(n_jobs=args.workers)(
         delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
-    print("\nFeature extraction completed in %s seconds\n" % (time.time() - start_time))
+    #  print("\nFeature extraction completed in %s seconds\n" % (time.time() - start_time))
 
-    print("\nOptimization started.\n")
+    #  print("\nOptimization started.\n")
     start_time = time.time()
     model = Doc2Vec(document_collections,
                     vector_size=args.dimensions,
@@ -153,60 +153,78 @@ def main(args):
                     workers=args.workers,
                     epochs=args.epochs,
                     alpha=args.learning_rate)
-    print("\nOptimization completed in %s seconds\n" % (time.time() - start_time))
+    #  print("\nOptimization completed in %s seconds\n" % (time.time() - start_time))
 
     vectors = save_embedding(args.output_path + "/vectors.csv", model, graphs, args.dimensions).values.tolist()
 
-    print("\nDistance computation started.\n")
+    #  print("\nDistance computation started.\n")
     start_time = time.time()
-    compute_distances_to_initial(vectors, args.output_path + "/distsToInitial.csv")
-    compute_distances_to_mean(vectors, args.output_path + "/distsToMean.csv")
-    print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
-
-    print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
-
-
-def compute_distances_to_initial(vectors, output_path):
-    df = pd.DataFrame(vectors)
-    inv_cov = np.linalg.inv(df.cov())
-    euclidian_dists = []
-    cosine_dists = []
-    minkowski_dists = []
-    mahalanobis_dists = []
-    braycurtis_dists = []
-    canberra_dists = []
-    chebyshev_dists = []
-    cityblock_dists = []
-    correlation_dists = []
-    i = 1
-    while i < len(vectors):
-        euclidian_dists.append(euclidean(np.array(vectors[i]), np.array(vectors[0])))
-        cosine_dists.append(cosine(np.array(vectors[i]), np.array(vectors[0])))
-        minkowski_dists.append(minkowski(np.array(vectors[i]), np.array(vectors[0])))
-        mahalanobis_dists.append(mahalanobis(np.array(vectors[i]), np.array(vectors[0]), inv_cov))
-        braycurtis_dists.append(braycurtis(np.array(vectors[i]), np.array(vectors[0])))
-        canberra_dists.append(canberra(np.array(vectors[i]), np.array(vectors[0])))
-        chebyshev_dists.append(chebyshev(np.array(vectors[i]), np.array(vectors[0])))
-        cityblock_dists.append(cityblock(np.array(vectors[i]), np.array(vectors[0])))
-        correlation_dists.append(correlation(np.array(vectors[i]), np.array(vectors[0])))
-        i += 1
-    pd.DataFrame({'euclidian': euclidian_dists,
-                  'cosine': cosine_dists,
-                  'minkowski': minkowski_dists,
-                  'mahalanobis': mahalanobis_dists,
-                  'braycurtis': braycurtis_dists,
-                  'canberra': canberra_dists,
-                  'chebyshev': chebyshev_dists,
-                  'cityblock': cityblock_dists,
-                  'correlation': correlation_dists
-                  }).to_csv(output_path, index=False)
-
-
-def compute_distances_to_mean(vectors, output_path):
+    initial = np.array(vectors[0])
     del vectors[0]  # delete the initial networks vector
     df = pd.DataFrame(vectors)
     inv_cov = np.linalg.inv(df.cov())
     means = df.mean()
+    dists_map_initial = compute_distances(vectors, initial, inv_cov, args.output_path + "/distsToInitial.csv")
+    dists_map_mean = compute_distances(vectors, means, inv_cov, args.output_path + "/distsToMean.csv")
+    #  print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
+
+    events_map_initial = compute_events(dists_map_initial)
+    events_map_mean = compute_events(dists_map_mean)
+
+    compute_average_precisions(events_map_initial, args.ground_truth, args.output_path + "/averagePrecisionsInitial.csv")
+    compute_average_precisions(events_map_mean, args.ground_truth, args.output_path + "/averagePrecisionsMean.csv")
+
+    print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
+
+
+def compute_average_precisions(events_map, ground_truth_events, output_path):
+    average_precisions_map = {}
+    for key, value in events_map.items():
+        average_precisions_map[key] = compute_average_precision(value, ground_truth_events)
+    pd.DataFrame(average_precisions_map, index=[0]).to_csv(output_path, index=False)
+    print(output_path + ":")
+    print(average_precisions_map)
+    return average_precisions_map
+
+
+def compute_average_precision(events_map, ground_truth_events):
+    recall_precision_map = {}
+    for threshold, events in events_map.items():
+        detected_true_events = np.intersect1d(events, ground_truth_events)
+        precision = 0 if len(events) == 0 else len(detected_true_events) / len(events)
+        recall = len(detected_true_events) / len(ground_truth_events)
+        recall_precision_map[recall] = precision
+    average_precision = 0.0
+    prev_recall = 0.0
+    prev_precision = 0.0
+    for recall, precision in sorted(recall_precision_map.items()):
+        average_precision += ((prev_precision + precision) / 2 * (recall - prev_recall))
+        prev_recall = recall
+        prev_precision = precision
+    return round(average_precision, 2)
+
+
+def compute_events(dists_map):
+    events_map = {}
+    for key, value in dists_map.items():
+        events_map[key] = detect_events(value)
+    return events_map
+
+
+def detect_events(dists):
+    events_map = {}
+    min_dist = min(dists)
+    max_dist = max(dists)
+    if min_dist != max_dist:
+        for threshold in np.linspace(min_dist, max_dist, 100):
+            events_map[threshold] = []
+            for i, dist in enumerate(dists):
+                if dist >= threshold:
+                    events_map[threshold].append(i + 1)
+    return events_map
+
+
+def compute_distances(vectors, reference, inv_cov, output_path):
     euclidian_dists = []
     cosine_dists = []
     minkowski_dists = []
@@ -216,26 +234,30 @@ def compute_distances_to_mean(vectors, output_path):
     chebyshev_dists = []
     cityblock_dists = []
     correlation_dists = []
-    for i, sample in df.iterrows():
-        euclidian_dists.append(euclidean(sample, means))
-        cosine_dists.append(cosine(sample, means))
-        minkowski_dists.append(minkowski(sample, means))
-        mahalanobis_dists.append(mahalanobis(sample, means, inv_cov))
-        braycurtis_dists.append(braycurtis(sample, means))
-        canberra_dists.append(canberra(sample, means))
-        chebyshev_dists.append(chebyshev(sample, means))
-        cityblock_dists.append(cityblock(sample, means))
-        correlation_dists.append(correlation(sample, means))
-    pd.DataFrame({'euclidian': euclidian_dists,
-                  'cosine': cosine_dists,
-                  'minkowski': minkowski_dists,
-                  'mahalanobis': mahalanobis_dists,
-                  'braycurtis': braycurtis_dists,
-                  'canberra': canberra_dists,
-                  'chebyshev': chebyshev_dists,
-                  'cityblock': cityblock_dists,
-                  'correlation': correlation_dists
-                  }).to_csv(output_path, index=False)
+    i = 0
+    while i < len(vectors):
+        euclidian_dists.append(round(euclidean(np.array(vectors[i]), reference), 3))
+        cosine_dists.append(round(cosine(np.array(vectors[i]), reference), 3))
+        minkowski_dists.append(round(minkowski(np.array(vectors[i]), reference, 1), 3))
+        mahalanobis_dists.append(round(mahalanobis(np.array(vectors[i]), reference, inv_cov), 3))
+        braycurtis_dists.append(round(braycurtis(np.array(vectors[i]), reference), 3))
+        canberra_dists.append(round(canberra(np.array(vectors[i]), reference), 3))
+        chebyshev_dists.append(round(chebyshev(np.array(vectors[i]), reference), 3))
+        cityblock_dists.append(round(cityblock(np.array(vectors[i]), reference), 3))
+        correlation_dists.append(round(correlation(np.array(vectors[i]), reference), 3))
+        i += 1
+    dists_map = {'euclidian': euclidian_dists,
+                 'cosine': cosine_dists,
+                 'minkowski': minkowski_dists,
+                 'mahalanobis': mahalanobis_dists,
+                 'braycurtis': braycurtis_dists,
+                 'canberra': canberra_dists,
+                 'chebyshev': chebyshev_dists,
+                 'cityblock': cityblock_dists,
+                 'correlation': correlation_dists
+                 }
+    pd.DataFrame(dists_map).to_csv(output_path, index=False)
+    return dists_map
 
 
 if __name__ == "__main__":

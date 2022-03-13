@@ -56,4 +56,8 @@ def parameter_parser():
                         default=0.0001,
 	                help="Down sampling rate of features. Default is 0.0001.")
 
+    parser.add_argument("--ground-truth",
+                        nargs="+",
+                        help="Ground truth event time steps.")
+
     return parser.parse_args()
