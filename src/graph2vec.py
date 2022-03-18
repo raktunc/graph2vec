@@ -1,5 +1,4 @@
 """Graph2Vec module."""
-import ast
 import os
 import glob
 import hashlib
@@ -182,8 +181,8 @@ def compute_average_precisions(events_map, ground_truth_events, output_path):
     for key, value in events_map.items():
         average_precisions_map[key] = compute_average_precision(value, ground_truth_events)
     pd.DataFrame(average_precisions_map, index=[0]).to_csv(output_path, index=False)
-    print(output_path + ":")
-    print(average_precisions_map)
+    #  print(output_path + ":")
+    #  print(average_precisions_map)
     return average_precisions_map
 
 
