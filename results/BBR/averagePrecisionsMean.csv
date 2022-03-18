@@ -1,0 +1,2 @@
+euclidian,cosine,minkowski,mahalanobis,braycurtis,canberra,chebyshev,cityblock,correlation
+0.08,0.05,0.08,0.04,0.08,0.08,0.12,0.08,0.05

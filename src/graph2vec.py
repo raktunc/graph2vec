@@ -135,13 +135,13 @@ def main(args):
     graphs = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
     graphs.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
 
-    #  print("\nFeature extraction started.\n")
+    print("\nFeature extraction started.\n")
     start_time = time.time()
     document_collections = Parallel(n_jobs=args.workers)(
         delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
-    #  print("\nFeature extraction completed in %s seconds\n" % (time.time() - start_time))
+    print("\nFeature extraction completed in %s seconds\n" % (time.time() - start_time))
 
-    #  print("\nOptimization started.\n")
+    print("\nOptimization started.\n")
     start_time = time.time()
     model = Doc2Vec(document_collections,
                     vector_size=args.dimensions,
@@ -152,11 +152,11 @@ def main(args):
                     workers=args.workers,
                     epochs=args.epochs,
                     alpha=args.learning_rate)
-    #  print("\nOptimization completed in %s seconds\n" % (time.time() - start_time))
+    print("\nOptimization completed in %s seconds\n" % (time.time() - start_time))
 
     vectors = save_embedding(args.output_path + "/vectors.csv", model, graphs, args.dimensions).values.tolist()
 
-    #  print("\nDistance computation started.\n")
+    print("\nDistance computation started.\n")
     start_time = time.time()
     initial = np.array(vectors[0])
     del vectors[0]  # delete the initial networks vector
@@ -165,7 +165,7 @@ def main(args):
     means = df.mean()
     dists_map_initial = compute_distances(vectors, initial, inv_cov, args.output_path + "/distsToInitial.csv")
     dists_map_mean = compute_distances(vectors, means, inv_cov, args.output_path + "/distsToMean.csv")
-    #  print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
+    print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
 
     events_map_initial = compute_events(dists_map_initial)
     events_map_mean = compute_events(dists_map_mean)
