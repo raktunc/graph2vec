@@ -6,52 +6,68 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import time
-from karateclub import Graph2Vec, WaveletCharacteristic, LDP, FeatherGraph
+from karateclub import Graph2Vec, FeatherGraph
 from numpy.linalg import LinAlgError
 from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, braycurtis, canberra, chebyshev, \
     cityblock, correlation
 
-from param_parser import parameter_parser
+embedding_methods = ["Graph2Vec", "FeatherGraph"]
+
+dataset_values_map = {
+    "RMS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\SMS\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
+    "RMV": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\Voice\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
+    "CS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\CentralSquare\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
+
+}
 
 
-def main(args):
-    """
-    Main function to read the graph list, extract features.
-    Learn the embedding and save it.
-    :param args: Object with the arguments.
-    """
+def main():
     process_start_time = time.time()
 
-    graph_files = get_graph_files(args)
-    vectors = compute_graph_embeddings(args, graph_files)
-    dists_map_initial, dists_map_mean = compute_distances_among_time_steps(args, vectors)
-    detect_events_and_evaluate(args, dists_map_initial, dists_map_mean)
+    for key, value in dataset_values_map.items():
+        graph_files = get_graph_files(value["input_path"])
+        run_experiment(key, graph_files, value["ground_truth"])
 
     print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
 
 
-def get_graph_files(args):
-    graph_files = glob.glob(os.path.join(args.input_path, "[0-9]SLM.txt"))
-    graph_files.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9]SLM.txt")))
+def run_experiment(dataset, graph_files, ground_truth):
+    print("\nExperiment started. Dataset: " + dataset + "\n")
+    start_time = time.time()
+    for embedding_method in embedding_methods:
+        output_path = "results/" + embedding_method + "/" + dataset
+        vectors = compute_graph_embeddings(output_path, embedding_method, graph_files)
+        dists_map_initial, dists_map_mean = compute_distances_among_time_steps(output_path, vectors)
+        detect_events_and_evaluate(output_path, ground_truth, dists_map_initial, dists_map_mean)
+    print("\nExperiment " + dataset + " completed in %s seconds\n" % (time.time() - start_time))
+
+def get_graph_files(input_path):
+    graph_files = glob.glob(os.path.join(input_path, "[0-9]SLM.txt"))
+    graph_files.extend(glob.glob(os.path.join(input_path, "[0-9][0-9]SLM.txt")))
     if len(graph_files) == 0:
-        graph_files = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
-        graph_files.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
+        graph_files = glob.glob(os.path.join(input_path, "[0-9].txt"))
+        graph_files.extend(glob.glob(os.path.join(input_path, "[0-9][0-9].txt")))
     return graph_files
 
 
-def compute_graph_embeddings(args, graph_files):
-    print("\nGraph embedding started.\n")
+def compute_graph_embeddings(output_path, embedding_method, graph_files):
+    print("\nGraph embedding started. Method: " + embedding_method + "\n")
     start_time = time.time()
     graphs = list(map(get_nx_graph_from_file, graph_files))
-    graph2vec_model = Graph2Vec()
-    graph2vec_model.fit(graphs)
-    vectors = graph2vec_model.get_embedding().tolist()
-    pd.DataFrame(vectors).to_csv(args.output_path + "/vectors.csv", index=False, header=False)
-    print("\nGraph embedding completed in %s seconds\n" % (time.time() - start_time))
+    embedding_model = Graph2Vec()
+    if embedding_method == "Graph2Vec":
+        embedding_model = Graph2Vec()
+    elif embedding_method == "FeatherGraph":
+        embedding_model = FeatherGraph()
+
+    embedding_model.fit(graphs)
+    vectors = embedding_model.get_embedding().tolist()
+    pd.DataFrame(vectors).to_csv(output_path + "/vectors.csv", index=False, header=False)
+    print("\nGraph embedding " + embedding_method + " completed in %s seconds\n" % (time.time() - start_time))
     return vectors
 
 
-def compute_distances_among_time_steps(args, vectors):
+def compute_distances_among_time_steps(output_path, vectors):
     print("\nDistance computation started.\n")
     start_time = time.time()
     initial = np.array(vectors[0])
@@ -62,21 +78,21 @@ def compute_distances_among_time_steps(args, vectors):
     except:
         inv_cov = None
     means = df.mean()
-    dists_map_initial = compute_distances(vectors, initial, inv_cov, args.output_path + "/distsToInitial.csv")
-    dists_map_mean = compute_distances(vectors, means, inv_cov, args.output_path + "/distsToMean.csv")
+    dists_map_initial = compute_distances(vectors, initial, inv_cov, output_path + "/distsToInitial.csv")
+    dists_map_mean = compute_distances(vectors, means, inv_cov, output_path + "/distsToMean.csv")
     print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
     return dists_map_initial, dists_map_mean
 
 
-def detect_events_and_evaluate(args, dists_map_initial, dists_map_mean):
+def detect_events_and_evaluate(output_path, ground_truth, dists_map_initial, dists_map_mean):
     print("\nEvent detection and evaluation started.\n")
     start_time = time.time()
     events_map_initial = compute_events(dists_map_initial)
     events_map_mean = compute_events(dists_map_mean)
-    average_precisions_initial = compute_average_precisions(events_map_initial, args.ground_truth)
-    average_precisions_mean = compute_average_precisions(events_map_mean, args.ground_truth)
+    average_precisions_initial = compute_average_precisions(events_map_initial, ground_truth)
+    average_precisions_mean = compute_average_precisions(events_map_mean, ground_truth)
     pd.DataFrame(merge_dictionary(average_precisions_initial, average_precisions_mean),
-                 index=["mean", "initial"]).to_csv(args.output_path + "/averagePrecisions.csv")
+                 index=["mean", "initial"]).to_csv(output_path + "/averagePrecisions.csv")
     print("\nEvent detection and evaluation completed in %s seconds\n" % (time.time() - start_time))
 
 
@@ -176,5 +192,4 @@ def merge_dictionary(dict_1, dict_2):
 
 
 if __name__ == "__main__":
-    args = parameter_parser()
-    main(args)
+    main()
