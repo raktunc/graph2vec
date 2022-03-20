@@ -1,127 +1,21 @@
 """Graph2Vec module."""
-import os
 import glob
-import hashlib
+import os
 
+import networkx as nx
 import numpy as np
 import pandas as pd
-import networkx as nx
+import time
+from karateclub import Graph2Vec
 from numpy.linalg import LinAlgError
 from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, braycurtis, canberra, chebyshev, \
     cityblock, correlation
-from tqdm import tqdm
-from joblib import Parallel, delayed
+
 from param_parser import parameter_parser
-from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-import time
 
 
-class WeisfeilerLehmanMachine:
-    """
-    Weisfeiler Lehman feature extractor class.
-    """
-
-    def __init__(self, graph, features, iterations):
-        """
-        Initialization method which also executes feature extraction.
-        :param graph: The Nx graph object.
-        :param features: Feature hash table.
-        :param iterations: Number of WL iterations.
-        """
-        self.iterations = iterations
-        self.graph = graph
-        self.features = features
-        self.nodes = self.graph.nodes()
-        self.extracted_features = [str(v) for k, v in features.items()]
-        self.do_recursions()
-
-    def do_a_recursion(self):
-        """
-        The method does a single WL recursion.
-        :return new_features: The hash table with extracted WL features.
-        """
-        new_features = {}
-        for node in self.nodes:
-            nebs = self.graph.neighbors(node)
-            degs = [self.features[neb] for neb in nebs]
-            features = [str(self.features[node])] + sorted([str(deg) for deg in degs])
-            features = "_".join(features)
-            hash_object = hashlib.md5(features.encode())
-            hashing = hash_object.hexdigest()
-            new_features[node] = hashing
-        self.extracted_features = self.extracted_features + list(new_features.values())
-        return new_features
-
-    def do_recursions(self):
-        """
-        The method does a series of WL recursions.
-        """
-        for _ in range(self.iterations):
-            self.features = self.do_a_recursion()
-
-
-def path2name(path):
-    base = os.path.basename(path)
-    return os.path.splitext(base)[0]
-
-
-def dataset_reader(path):
-    """
-    Function to read the graph and features from a json file.
-    :param path: The path to the graph json.
-    :return graph: The graph object.
-    :return features: Features hash table.
-    :return name: Name of the graph.
-    """
-    name = path2name(path)
-
-    edgelist = []
-    with open(path) as f:
-        for line in f:
-            edge = line.split()
-            if len(edge) > 2:
-                del edge[2]
-            edgelist.append([int(node) for node in edge])
-
-    graph = nx.from_edgelist(edgelist, nx.DiGraph)
-
-    features = nx.degree(graph)
-    features = {int(k): v for k, v in features}
-
-    return graph, features, name
-
-
-def feature_extractor(path, rounds):
-    """
-    Function to extract WL features from a graph.
-    :param path: The path to the graph json.
-    :param rounds: Number of WL iterations.
-    :return doc: Document collection object.
-    """
-    graph, features, name = dataset_reader(path)
-    machine = WeisfeilerLehmanMachine(graph, features, rounds)
-    doc = TaggedDocument(words=machine.extracted_features, tags=["g_" + name])
-    return doc
-
-
-def save_embedding(output_path, model, files, dimensions):
-    """
-    Function to save the embedding.
-    :param output_path: Path to the embedding csv.
-    :param model: The embedding model object.
-    :param files: The list of files.
-    :param dimensions: The embedding dimension parameter.
-    """
-    out = []
-    for f in files:
-        identifier = path2name(f)
-        out.append([int(identifier)] + list(model.dv["g_" + identifier]))
-    column_names = ["timeStep"] + ["x_" + str(dim) for dim in range(dimensions)]
-    out = pd.DataFrame(out, columns=column_names)
-    out = out.sort_values(["timeStep"])
-    out.to_csv(output_path, index=None)
-    out.drop("timeStep", inplace=True, axis=1)
-    return out
+def get_nx_graph_from_file(path):
+    return nx.read_edgelist(path, nodetype=int, data=(("weight", int),), create_using=nx.DiGraph)
 
 
 def main(args):
@@ -132,29 +26,23 @@ def main(args):
     """
     process_start_time = time.time()
 
-    graphs = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
-    graphs.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
+    graph_files = glob.glob(os.path.join(args.input_path, "[0-9]SLM.txt"))
+    graph_files.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9]SLM.txt")))
 
-    print("\nFeature extraction started.\n")
+    if len(graph_files) == 0:
+        graph_files = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
+        graph_files.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
+
+    print("\nGraph embedding started.\n")
     start_time = time.time()
-    document_collections = Parallel(n_jobs=args.workers)(
-        delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
-    print("\nFeature extraction completed in %s seconds\n" % (time.time() - start_time))
 
-    print("\nOptimization started.\n")
-    start_time = time.time()
-    model = Doc2Vec(document_collections,
-                    vector_size=args.dimensions,
-                    window=0,
-                    min_count=args.min_count,
-                    dm=0,
-                    sample=args.down_sampling,
-                    workers=args.workers,
-                    epochs=args.epochs,
-                    alpha=args.learning_rate)
-    print("\nOptimization completed in %s seconds\n" % (time.time() - start_time))
+    graphs = list(map(get_nx_graph_from_file, graph_files))
 
-    vectors = save_embedding(args.output_path + "/vectors.csv", model, graphs, args.dimensions).values.tolist()
+    graph2vec_model = Graph2Vec()
+    graph2vec_model.fit(graphs)
+    vectors = graph2vec_model.get_embedding().tolist()
+    pd.DataFrame(vectors).to_csv(args.output_path + "/vectors.csv", index=False, header=False)
+    print("\nGraph embedding completed in %s seconds\n" % (time.time() - start_time))
 
     print("\nDistance computation started.\n")
     start_time = time.time()
@@ -170,7 +58,8 @@ def main(args):
     events_map_initial = compute_events(dists_map_initial)
     events_map_mean = compute_events(dists_map_mean)
 
-    compute_average_precisions(events_map_initial, args.ground_truth, args.output_path + "/averagePrecisionsInitial.csv")
+    compute_average_precisions(events_map_initial, args.ground_truth,
+                               args.output_path + "/averagePrecisionsInitial.csv")
     compute_average_precisions(events_map_mean, args.ground_truth, args.output_path + "/averagePrecisionsMean.csv")
 
     print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
