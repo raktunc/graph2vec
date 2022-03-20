@@ -6,7 +6,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import time
-from karateclub import Graph2Vec
+from karateclub import Graph2Vec, WaveletCharacteristic, LDP, FeatherGraph
 from numpy.linalg import LinAlgError
 from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, braycurtis, canberra, chebyshev, \
     cityblock, correlation
@@ -57,7 +57,10 @@ def compute_distances_among_time_steps(args, vectors):
     initial = np.array(vectors[0])
     del vectors[0]  # delete the initial networks vector
     df = pd.DataFrame(vectors)
-    inv_cov = np.linalg.inv(df.cov())
+    try:
+        inv_cov = np.linalg.inv(df.cov())
+    except:
+        inv_cov = None
     means = df.mean()
     dists_map_initial = compute_distances(vectors, initial, inv_cov, args.output_path + "/distsToInitial.csv")
     dists_map_mean = compute_distances(vectors, means, inv_cov, args.output_path + "/distsToMean.csv")
@@ -70,9 +73,10 @@ def detect_events_and_evaluate(args, dists_map_initial, dists_map_mean):
     start_time = time.time()
     events_map_initial = compute_events(dists_map_initial)
     events_map_mean = compute_events(dists_map_mean)
-    compute_average_precisions(events_map_initial, args.ground_truth,
-                               args.output_path + "/averagePrecisionsInitial.csv")
-    compute_average_precisions(events_map_mean, args.ground_truth, args.output_path + "/averagePrecisionsMean.csv")
+    average_precisions_initial = compute_average_precisions(events_map_initial, args.ground_truth)
+    average_precisions_mean = compute_average_precisions(events_map_mean, args.ground_truth)
+    pd.DataFrame(merge_dictionary(average_precisions_initial, average_precisions_mean),
+                 index=["mean", "initial"]).to_csv(args.output_path + "/averagePrecisions.csv")
     print("\nEvent detection and evaluation completed in %s seconds\n" % (time.time() - start_time))
 
 
@@ -95,7 +99,8 @@ def compute_distances(vectors, reference, inv_cov, output_path):
         euclidian_dists.append(round(euclidean(np.array(vectors[i]), reference), 3))
         cosine_dists.append(round(cosine(np.array(vectors[i]), reference), 3))
         minkowski_dists.append(round(minkowski(np.array(vectors[i]), reference, 1), 3))
-        mahalanobis_dists.append(round(mahalanobis(np.array(vectors[i]), reference, inv_cov), 3))
+        if inv_cov is not None:
+            mahalanobis_dists.append(round(mahalanobis(np.array(vectors[i]), reference, inv_cov), 3))
         braycurtis_dists.append(round(braycurtis(np.array(vectors[i]), reference), 3))
         canberra_dists.append(round(canberra(np.array(vectors[i]), reference), 3))
         chebyshev_dists.append(round(chebyshev(np.array(vectors[i]), reference), 3))
@@ -112,6 +117,8 @@ def compute_distances(vectors, reference, inv_cov, output_path):
                  'cityblock': cityblock_dists,
                  'correlation': correlation_dists
                  }
+    if inv_cov is None:
+        del dists_map['mahalanobis']
     pd.DataFrame(dists_map).to_csv(output_path, index=False)
     return dists_map
 
@@ -136,11 +143,10 @@ def detect_events(dists):
     return events_map
 
 
-def compute_average_precisions(events_map, ground_truth_events, output_path):
+def compute_average_precisions(events_map, ground_truth_events):
     average_precisions_map = {}
     for key, value in events_map.items():
         average_precisions_map[key] = compute_average_precision(value, ground_truth_events)
-    pd.DataFrame(average_precisions_map, index=[0]).to_csv(output_path, index=False)
     return average_precisions_map
 
 
@@ -159,6 +165,14 @@ def compute_average_precision(events_map, ground_truth_events):
         prev_recall = recall
         prev_precision = precision
     return round(average_precision, 2)
+
+
+def merge_dictionary(dict_1, dict_2):
+    dict_3 = {**dict_1, **dict_2}
+    for key, value in dict_3.items():
+        if key in dict_1 and key in dict_2:
+            dict_3[key] = [value, dict_1[key]]
+    return dict_3
 
 
 if __name__ == "__main__":
