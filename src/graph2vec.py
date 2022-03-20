@@ -14,10 +14,6 @@ from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, br
 from param_parser import parameter_parser
 
 
-def get_nx_graph_from_file(path):
-    return nx.read_edgelist(path, nodetype=int, data=(("weight", int),), create_using=nx.DiGraph)
-
-
 def main(args):
     """
     Main function to read the graph list, extract features.
@@ -26,24 +22,36 @@ def main(args):
     """
     process_start_time = time.time()
 
+    graph_files = get_graph_files(args)
+    vectors = compute_graph_embeddings(args, graph_files)
+    dists_map_initial, dists_map_mean = compute_distances_among_time_steps(args, vectors)
+    detect_events_and_evaluate(args, dists_map_initial, dists_map_mean)
+
+    print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
+
+
+def get_graph_files(args):
     graph_files = glob.glob(os.path.join(args.input_path, "[0-9]SLM.txt"))
     graph_files.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9]SLM.txt")))
-
     if len(graph_files) == 0:
         graph_files = glob.glob(os.path.join(args.input_path, "[0-9].txt"))
         graph_files.extend(glob.glob(os.path.join(args.input_path, "[0-9][0-9].txt")))
+    return graph_files
 
+
+def compute_graph_embeddings(args, graph_files):
     print("\nGraph embedding started.\n")
     start_time = time.time()
-
     graphs = list(map(get_nx_graph_from_file, graph_files))
-
     graph2vec_model = Graph2Vec()
     graph2vec_model.fit(graphs)
     vectors = graph2vec_model.get_embedding().tolist()
     pd.DataFrame(vectors).to_csv(args.output_path + "/vectors.csv", index=False, header=False)
     print("\nGraph embedding completed in %s seconds\n" % (time.time() - start_time))
+    return vectors
 
+
+def compute_distances_among_time_steps(args, vectors):
     print("\nDistance computation started.\n")
     start_time = time.time()
     initial = np.array(vectors[0])
@@ -54,62 +62,22 @@ def main(args):
     dists_map_initial = compute_distances(vectors, initial, inv_cov, args.output_path + "/distsToInitial.csv")
     dists_map_mean = compute_distances(vectors, means, inv_cov, args.output_path + "/distsToMean.csv")
     print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
+    return dists_map_initial, dists_map_mean
 
+
+def detect_events_and_evaluate(args, dists_map_initial, dists_map_mean):
+    print("\nEvent detection and evaluation started.\n")
+    start_time = time.time()
     events_map_initial = compute_events(dists_map_initial)
     events_map_mean = compute_events(dists_map_mean)
-
     compute_average_precisions(events_map_initial, args.ground_truth,
                                args.output_path + "/averagePrecisionsInitial.csv")
     compute_average_precisions(events_map_mean, args.ground_truth, args.output_path + "/averagePrecisionsMean.csv")
-
-    print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
-
-
-def compute_average_precisions(events_map, ground_truth_events, output_path):
-    average_precisions_map = {}
-    for key, value in events_map.items():
-        average_precisions_map[key] = compute_average_precision(value, ground_truth_events)
-    pd.DataFrame(average_precisions_map, index=[0]).to_csv(output_path, index=False)
-    #  print(output_path + ":")
-    #  print(average_precisions_map)
-    return average_precisions_map
+    print("\nEvent detection and evaluation completed in %s seconds\n" % (time.time() - start_time))
 
 
-def compute_average_precision(events_map, ground_truth_events):
-    recall_precision_map = {}
-    for threshold, events in events_map.items():
-        detected_true_events = np.intersect1d(events, ground_truth_events)
-        precision = 0 if len(events) == 0 else len(detected_true_events) / len(events)
-        recall = len(detected_true_events) / len(ground_truth_events)
-        recall_precision_map[recall] = precision
-    average_precision = 0.0
-    prev_recall = 0.0
-    prev_precision = 0.0
-    for recall, precision in sorted(recall_precision_map.items()):
-        average_precision += ((prev_precision + precision) / 2 * (recall - prev_recall))
-        prev_recall = recall
-        prev_precision = precision
-    return round(average_precision, 2)
-
-
-def compute_events(dists_map):
-    events_map = {}
-    for key, value in dists_map.items():
-        events_map[key] = detect_events(value)
-    return events_map
-
-
-def detect_events(dists):
-    events_map = {}
-    min_dist = min(dists)
-    max_dist = max(dists)
-    if min_dist != max_dist:
-        for threshold in np.linspace(min_dist, max_dist, 100):
-            events_map[threshold] = []
-            for i, dist in enumerate(dists):
-                if dist >= threshold:
-                    events_map[threshold].append(i + 1)
-    return events_map
+def get_nx_graph_from_file(path):
+    return nx.read_edgelist(path, nodetype=int, data=(("weight", int),), create_using=nx.DiGraph)
 
 
 def compute_distances(vectors, reference, inv_cov, output_path):
@@ -146,6 +114,51 @@ def compute_distances(vectors, reference, inv_cov, output_path):
                  }
     pd.DataFrame(dists_map).to_csv(output_path, index=False)
     return dists_map
+
+
+def compute_events(dists_map):
+    events_map = {}
+    for key, value in dists_map.items():
+        events_map[key] = detect_events(value)
+    return events_map
+
+
+def detect_events(dists):
+    events_map = {}
+    min_dist = min(dists)
+    max_dist = max(dists)
+    if min_dist != max_dist:
+        for threshold in np.linspace(min_dist, max_dist, 100):
+            events_map[threshold] = []
+            for i, dist in enumerate(dists):
+                if dist >= threshold:
+                    events_map[threshold].append(i + 1)
+    return events_map
+
+
+def compute_average_precisions(events_map, ground_truth_events, output_path):
+    average_precisions_map = {}
+    for key, value in events_map.items():
+        average_precisions_map[key] = compute_average_precision(value, ground_truth_events)
+    pd.DataFrame(average_precisions_map, index=[0]).to_csv(output_path, index=False)
+    return average_precisions_map
+
+
+def compute_average_precision(events_map, ground_truth_events):
+    recall_precision_map = {}
+    for threshold, events in events_map.items():
+        detected_true_events = np.intersect1d(events, ground_truth_events)
+        precision = 0 if len(events) == 0 else len(detected_true_events) / len(events)
+        recall = len(detected_true_events) / len(ground_truth_events)
+        recall_precision_map[recall] = precision
+    average_precision = 0.0
+    prev_recall = 0.0
+    prev_precision = 0.0
+    for recall, precision in sorted(recall_precision_map.items()):
+        average_precision += ((prev_precision + precision) / 2 * (recall - prev_recall))
+        prev_recall = recall
+        prev_precision = precision
+    return round(average_precision, 2)
 
 
 if __name__ == "__main__":
