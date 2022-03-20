@@ -6,18 +6,18 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import time
-from karateclub import Graph2Vec, FeatherGraph
+from karateclub import FeatherGraph, GL2Vec, Graph2Vec, LDP
 from numpy.linalg import LinAlgError
 from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, braycurtis, canberra, chebyshev, \
     cityblock, correlation
 
-embedding_methods = ["Graph2Vec", "FeatherGraph"]
+embedding_methods = ["FeatherGraph", "GL2Vec", "Graph2Vec", "LDP"]
 
 dataset_values_map = {
-    "RMS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\SMS\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
     "RMV": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\Voice\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
+    "RMS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\SMS\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
+    "ENRON": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\Enron1\\Graph", "ground_truth": [34, 42, 45, 56, 62, 73, 81]},
     "CS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\CentralSquare\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
-
 }
 
 
@@ -35,11 +35,15 @@ def run_experiment(dataset, graph_files, ground_truth):
     print("\nExperiment started. Dataset: " + dataset + "\n")
     start_time = time.time()
     for embedding_method in embedding_methods:
-        output_path = "results/" + embedding_method + "/" + dataset
-        vectors = compute_graph_embeddings(output_path, embedding_method, graph_files)
-        dists_map_initial, dists_map_mean = compute_distances_among_time_steps(output_path, vectors)
-        detect_events_and_evaluate(output_path, ground_truth, dists_map_initial, dists_map_mean)
+        try:
+            output_path = "results/" + embedding_method + "/" + dataset
+            vectors = compute_graph_embeddings(output_path, embedding_method, graph_files)
+            dists_map_initial, dists_map_mean = compute_distances_among_time_steps(output_path, vectors)
+            detect_events_and_evaluate(output_path, ground_truth, dists_map_initial, dists_map_mean)
+        except:
+            print("Error")
     print("\nExperiment " + dataset + " completed in %s seconds\n" % (time.time() - start_time))
+
 
 def get_graph_files(input_path):
     graph_files = glob.glob(os.path.join(input_path, "[0-9]SLM.txt"))
@@ -59,6 +63,10 @@ def compute_graph_embeddings(output_path, embedding_method, graph_files):
         embedding_model = Graph2Vec()
     elif embedding_method == "FeatherGraph":
         embedding_model = FeatherGraph()
+    elif embedding_method == "LDP":
+        embedding_model = LDP()
+    elif embedding_method == "GL2Vec":
+        embedding_model = GL2Vec()
 
     embedding_model.fit(graphs)
     vectors = embedding_model.get_embedding().tolist()

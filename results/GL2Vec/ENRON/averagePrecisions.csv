@@ -1,0 +1,3 @@
+,euclidian,cosine,minkowski,mahalanobis,braycurtis,canberra,chebyshev,cityblock,correlation
+mean,0.12,0.2,0.12,0.0,0.11,0.11,0.12,0.12,0.2
+initial,0.11,0.2,0.11,0.0,0.11,0.11,0.12,0.11,0.2
