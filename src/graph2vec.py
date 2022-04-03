@@ -12,12 +12,10 @@ from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, br
     cityblock, correlation
 
 dataset_values_map = {
-    "RMV": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\Voice\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
-    "RMS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\SMS\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
-    "ENRON": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\Enron1\\Graph", "ground_truth": [34, 42, 45, 56, 62, 73, 81]},
-    "CS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\CentralSquare\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
+    "BCS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\BigCentralSquare\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
+    "TGSM": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\Weighted\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
 }
-embedding_methods = ["FeatherGraph", "GL2Vec", "Graph2Vec", "LDP"]
+embedding_methods = ["Graph2Vec"]
 distance_methods = ['euclidian', 'cosine', 'minkowski', 'mahalanobis', 'braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation']
 
 def main():
@@ -44,7 +42,10 @@ def run_experiment(dataset, graph_files, ground_truth):
             vectors = compute_graph_embeddings(output_path, embedding_method, graph_files)
             dists_map_initial, dists_map_mean = compute_distances_among_time_steps(output_path, vectors)
             average_precisions = detect_events_and_evaluate(dataset, embedding_method, output_path, ground_truth, dists_map_initial, dists_map_mean)
-        except:
+        except Exception as inst:
+            print(type(inst))    # the exception instance
+            print(inst.args)     # arguments stored in .args
+            print(inst)
             print("\n-----------------------------------------------------------------------ERROR occurred. Dataset: " + dataset + "\n")
             average_precisions["dataset"] = [dataset, dataset]
             average_precisions["embedding_method"] = [embedding_method, embedding_method]
@@ -87,7 +88,7 @@ def compute_graph_embeddings(output_path, embedding_method, graph_files):
 
 
 def compute_distances_among_time_steps(output_path, vectors):
-    print("\nDistance computation started.\n")
+    # print("\nDistance computation started.\n")
     start_time = time.time()
     initial = np.array(vectors[0])
     del vectors[0]  # delete the initial networks vector
@@ -99,12 +100,12 @@ def compute_distances_among_time_steps(output_path, vectors):
     means = df.mean()
     dists_map_initial = compute_distances(vectors, initial, inv_cov, output_path + "/distsToInitial.csv")
     dists_map_mean = compute_distances(vectors, means, inv_cov, output_path + "/distsToMean.csv")
-    print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
+    # print("\nDistance computation completed in %s seconds\n" % (time.time() - start_time))
     return dists_map_initial, dists_map_mean
 
 
 def detect_events_and_evaluate(dataset, embedding_method, output_path, ground_truth, dists_map_initial, dists_map_mean):
-    print("\nEvent detection and evaluation started.\n")
+    # print("\nEvent detection and evaluation started.\n")
     start_time = time.time()
     events_map_initial = compute_events(dists_map_initial)
     events_map_mean = compute_events(dists_map_mean)
@@ -112,7 +113,7 @@ def detect_events_and_evaluate(dataset, embedding_method, output_path, ground_tr
     average_precisions_mean = compute_average_precisions(dataset, embedding_method, "mean", events_map_mean, ground_truth)
     average_precisions = merge_dictionary(average_precisions_initial, average_precisions_mean)
     pd.DataFrame(average_precisions).to_csv(output_path + "/averagePrecisions.csv", index=False)
-    print("\nEvent detection and evaluation completed in %s seconds\n" % (time.time() - start_time))
+    # print("\nEvent detection and evaluation completed in %s seconds\n" % (time.time() - start_time))
     return average_precisions
 
 

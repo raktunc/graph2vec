@@ -296,3 +296,38 @@ Total process completed in 612.6223220825195 seconds
 
 
 Process finished with exit code 0
+
+
+C:\Users\v-riaktu\venv\Scripts\python.exe C:/Users/v-riaktu/IdeaProjects/graph2vec/src/graph2vec.py
+
+-----------------------------------------------------------------------Experiment started. Dataset: BCS
+
+
+Graph embedding started. Method: Graph2Vec
+
+
+Graph embedding Graph2Vec completed in 217.07168412208557 seconds
+
+C:\Users\v-riaktu\venv\lib\site-packages\scipy\spatial\distance.py:1069: RuntimeWarning: invalid value encountered in sqrt
+  return np.sqrt(m)
+
+-----------------------------------------------------------------------Experiment BCS completed in 223.26246404647827 seconds
+
+
+-----------------------------------------------------------------------Experiment started. Dataset: TGSM
+
+
+Graph embedding started. Method: Graph2Vec
+
+
+-----------------------------------------------------------------------ERROR occurred. Dataset: TGSM
+
+
+-----------------------------------------------------------------------Experiment TGSM completed in 4675.637091875076 seconds
+
+
+Total process completed in 4898.995759487152 seconds
+
+
+Process finished with exit code 0
+
