@@ -11,38 +11,49 @@ from numpy.linalg import LinAlgError
 from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, braycurtis, canberra, chebyshev, \
     cityblock, correlation
 
-embedding_methods = ["FeatherGraph", "GL2Vec", "Graph2Vec", "LDP"]
-
 dataset_values_map = {
     "RMV": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\Voice\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
     "RMS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\SMS\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
     "ENRON": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\Enron1\\Graph", "ground_truth": [34, 42, 45, 56, 62, 73, 81]},
     "CS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\CentralSquare\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
 }
-
+embedding_methods = ["FeatherGraph", "GL2Vec", "Graph2Vec", "LDP"]
+distance_methods = ['euclidian', 'cosine', 'minkowski', 'mahalanobis', 'braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation']
 
 def main():
     process_start_time = time.time()
 
+    average_precisions_all_methods_all_datasets = {}
     for key, value in dataset_values_map.items():
         graph_files = get_graph_files(value["input_path"])
-        run_experiment(key, graph_files, value["ground_truth"])
+        average_precisions_all_methods = run_experiment(key, graph_files, value["ground_truth"])
+        average_precisions_all_methods_all_datasets = merge_dictionary(average_precisions_all_methods, average_precisions_all_methods_all_datasets)
 
+    pd.DataFrame(average_precisions_all_methods_all_datasets).to_csv("results/averagePrecisions.csv", index=False)
     print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
 
 
 def run_experiment(dataset, graph_files, ground_truth):
-    print("\nExperiment started. Dataset: " + dataset + "\n")
+    print("\n-----------------------------------------------------------------------Experiment started. Dataset: " + dataset + "\n")
     start_time = time.time()
+    average_precisions = {}
+    average_precisions_all_methods = {}
     for embedding_method in embedding_methods:
         try:
             output_path = "results/" + embedding_method + "/" + dataset
             vectors = compute_graph_embeddings(output_path, embedding_method, graph_files)
             dists_map_initial, dists_map_mean = compute_distances_among_time_steps(output_path, vectors)
-            detect_events_and_evaluate(output_path, ground_truth, dists_map_initial, dists_map_mean)
+            average_precisions = detect_events_and_evaluate(dataset, embedding_method, output_path, ground_truth, dists_map_initial, dists_map_mean)
         except:
-            print("Error")
-    print("\nExperiment " + dataset + " completed in %s seconds\n" % (time.time() - start_time))
+            print("\n-----------------------------------------------------------------------ERROR occurred. Dataset: " + dataset + "\n")
+            average_precisions["dataset"] = [dataset, dataset]
+            average_precisions["embedding_method"] = [embedding_method, embedding_method]
+            average_precisions["reference_vector"] = ["mean", "initial"]
+            for distance_method in distance_methods:
+                average_precisions[distance_method] = [0, 0]
+        average_precisions_all_methods = merge_dictionary(average_precisions, average_precisions_all_methods)
+    print("\n-----------------------------------------------------------------------Experiment " + dataset + " completed in %s seconds\n" % (time.time() - start_time))
+    return average_precisions_all_methods
 
 
 def get_graph_files(input_path):
@@ -92,16 +103,17 @@ def compute_distances_among_time_steps(output_path, vectors):
     return dists_map_initial, dists_map_mean
 
 
-def detect_events_and_evaluate(output_path, ground_truth, dists_map_initial, dists_map_mean):
+def detect_events_and_evaluate(dataset, embedding_method, output_path, ground_truth, dists_map_initial, dists_map_mean):
     print("\nEvent detection and evaluation started.\n")
     start_time = time.time()
     events_map_initial = compute_events(dists_map_initial)
     events_map_mean = compute_events(dists_map_mean)
-    average_precisions_initial = compute_average_precisions(events_map_initial, ground_truth)
-    average_precisions_mean = compute_average_precisions(events_map_mean, ground_truth)
-    pd.DataFrame(merge_dictionary(average_precisions_initial, average_precisions_mean),
-                 index=["mean", "initial"]).to_csv(output_path + "/averagePrecisions.csv")
+    average_precisions_initial = compute_average_precisions(dataset, embedding_method, "initial", events_map_initial, ground_truth)
+    average_precisions_mean = compute_average_precisions(dataset, embedding_method, "mean", events_map_mean, ground_truth)
+    average_precisions = merge_dictionary(average_precisions_initial, average_precisions_mean)
+    pd.DataFrame(average_precisions).to_csv(output_path + "/averagePrecisions.csv", index=False)
     print("\nEvent detection and evaluation completed in %s seconds\n" % (time.time() - start_time))
+    return average_precisions
 
 
 def get_nx_graph_from_file(path):
@@ -125,6 +137,8 @@ def compute_distances(vectors, reference, inv_cov, output_path):
         minkowski_dists.append(round(minkowski(np.array(vectors[i]), reference, 1), 3))
         if inv_cov is not None:
             mahalanobis_dists.append(round(mahalanobis(np.array(vectors[i]), reference, inv_cov), 3))
+        else:
+            mahalanobis_dists.append(0)
         braycurtis_dists.append(round(braycurtis(np.array(vectors[i]), reference), 3))
         canberra_dists.append(round(canberra(np.array(vectors[i]), reference), 3))
         chebyshev_dists.append(round(chebyshev(np.array(vectors[i]), reference), 3))
@@ -141,8 +155,6 @@ def compute_distances(vectors, reference, inv_cov, output_path):
                  'cityblock': cityblock_dists,
                  'correlation': correlation_dists
                  }
-    if inv_cov is None:
-        del dists_map['mahalanobis']
     pd.DataFrame(dists_map).to_csv(output_path, index=False)
     return dists_map
 
@@ -167,8 +179,8 @@ def detect_events(dists):
     return events_map
 
 
-def compute_average_precisions(events_map, ground_truth_events):
-    average_precisions_map = {}
+def compute_average_precisions(dataset, embedding_method, reference_vector, events_map, ground_truth_events):
+    average_precisions_map = {"dataset": dataset, "embedding_method": embedding_method, "reference_vector": reference_vector}
     for key, value in events_map.items():
         average_precisions_map[key] = compute_average_precision(value, ground_truth_events)
     return average_precisions_map
@@ -195,7 +207,7 @@ def merge_dictionary(dict_1, dict_2):
     dict_3 = {**dict_1, **dict_2}
     for key, value in dict_3.items():
         if key in dict_1 and key in dict_2:
-            dict_3[key] = [value, dict_1[key]]
+            dict_3[key] = value + dict_1[key] if isinstance(value, list) else [value, dict_1[key]]
     return dict_3
 
 

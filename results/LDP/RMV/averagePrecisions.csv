@@ -1,3 +1,3 @@
-,euclidian,cosine,minkowski,braycurtis,canberra,chebyshev,cityblock,correlation
-mean,0.23,0.21,0.23,0.23,0.22,0.22,0.23,0.21
-initial,0.2,0.22,0.2,0.2,0.21,0.2,0.2,0.23
+dataset,embedding_method,reference_vector,euclidian,cosine,minkowski,mahalanobis,braycurtis,canberra,chebyshev,cityblock,correlation
+RMV,LDP,mean,0.23,0.21,0.23,0.0,0.23,0.22,0.22,0.23,0.21
+RMV,LDP,initial,0.2,0.22,0.2,0.0,0.2,0.21,0.2,0.2,0.23

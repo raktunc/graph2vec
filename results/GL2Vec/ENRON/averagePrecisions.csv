@@ -1,3 +1,3 @@
-,euclidian,cosine,minkowski,mahalanobis,braycurtis,canberra,chebyshev,cityblock,correlation
-mean,0.12,0.2,0.12,0.0,0.11,0.11,0.12,0.12,0.2
-initial,0.11,0.2,0.11,0.0,0.11,0.11,0.12,0.11,0.2
+dataset,embedding_method,reference_vector,euclidian,cosine,minkowski,mahalanobis,braycurtis,canberra,chebyshev,cityblock,correlation
+ENRON,GL2Vec,mean,0.12,0.2,0.12,0.09,0.12,0.14,0.12,0.12,0.2
+ENRON,GL2Vec,initial,0.12,0.2,0.12,0.0,0.11,0.11,0.12,0.12,0.2

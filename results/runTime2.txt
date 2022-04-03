@@ -1,0 +1,298 @@
+C:\Users\v-riaktu\venv\Scripts\python.exe C:/Users/v-riaktu/IdeaProjects/graph2vec/src/graph2vec.py
+
+-----------------------------------------------------------------------Experiment started. Dataset: RMV
+
+
+Graph embedding started. Method: FeatherGraph
+
+
+Graph embedding FeatherGraph completed in 1.16713285446167 seconds
+
+
+Distance computation started.
+
+C:\Users\v-riaktu\venv\lib\site-packages\scipy\spatial\distance.py:1069: RuntimeWarning: invalid value encountered in sqrt
+  return np.sqrt(m)
+
+Distance computation completed in 0.0963296890258789 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.04281783103942871 seconds
+
+
+Graph embedding started. Method: GL2Vec
+
+
+Graph embedding GL2Vec completed in 7.456241607666016 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.05695772171020508 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.04743528366088867 seconds
+
+
+Graph embedding started. Method: Graph2Vec
+
+
+Graph embedding Graph2Vec completed in 0.8528964519500732 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.05562448501586914 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.04218935966491699 seconds
+
+
+Graph embedding started. Method: LDP
+
+
+Graph embedding LDP completed in 1.5847015380859375 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.05096602439880371 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.0548250675201416 seconds
+
+
+-----------------------------------------------------------------------Experiment RMV completed in 11.576103448867798 seconds
+
+
+-----------------------------------------------------------------------Experiment started. Dataset: RMS
+
+
+Graph embedding started. Method: FeatherGraph
+
+
+Graph embedding FeatherGraph completed in 0.23920130729675293 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.09774255752563477 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.04334855079650879 seconds
+
+
+Graph embedding started. Method: GL2Vec
+
+
+Graph embedding GL2Vec completed in 0.5026404857635498 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.05912280082702637 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.042559146881103516 seconds
+
+
+Graph embedding started. Method: Graph2Vec
+
+
+Graph embedding Graph2Vec completed in 0.15137219429016113 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.061121225357055664 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.040103912353515625 seconds
+
+
+Graph embedding started. Method: LDP
+
+
+Graph embedding LDP completed in 0.300234317779541 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.050522804260253906 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.05609726905822754 seconds
+
+
+-----------------------------------------------------------------------Experiment RMS completed in 1.6537306308746338 seconds
+
+
+-----------------------------------------------------------------------Experiment started. Dataset: ENRON
+
+
+Graph embedding started. Method: FeatherGraph
+
+
+-----------------------------------------------------------------------ERROR occurred. Dataset: ENRON
+
+
+Graph embedding started. Method: GL2Vec
+
+
+Graph embedding GL2Vec completed in 0.7372841835021973 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.11258387565612793 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.04439139366149902 seconds
+
+
+Graph embedding started. Method: Graph2Vec
+
+
+Graph embedding Graph2Vec completed in 0.23415017127990723 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.08744549751281738 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.04236769676208496 seconds
+
+
+Graph embedding started. Method: LDP
+
+
+-----------------------------------------------------------------------ERROR occurred. Dataset: ENRON
+
+
+-----------------------------------------------------------------------Experiment ENRON completed in 1.8742530345916748 seconds
+
+
+-----------------------------------------------------------------------Experiment started. Dataset: CS
+
+
+Graph embedding started. Method: FeatherGraph
+
+
+Graph embedding FeatherGraph completed in 114.01918077468872 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.19400334358215332 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.045717477798461914 seconds
+
+
+Graph embedding started. Method: GL2Vec
+
+
+Graph embedding GL2Vec completed in 249.7331666946411 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.06356453895568848 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.04682207107543945 seconds
+
+
+Graph embedding started. Method: Graph2Vec
+
+
+Graph embedding Graph2Vec completed in 73.89902067184448 seconds
+
+
+Distance computation started.
+
+
+Distance computation completed in 0.045204877853393555 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.04277300834655762 seconds
+
+
+Graph embedding started. Method: LDP
+
+
+Graph embedding LDP completed in 151.5423083305359 seconds
+
+
+Distance computation started.
+
+C:\Users\v-riaktu\venv\lib\site-packages\scipy\spatial\distance.py:630: RuntimeWarning: invalid value encountered in sqrt
+  dist = 1.0 - uv / np.sqrt(uu * vv)
+
+Distance computation completed in 0.039930105209350586 seconds
+
+
+Event detection and evaluation started.
+
+
+Event detection and evaluation completed in 0.041046857833862305 seconds
+
+
+-----------------------------------------------------------------------Experiment CS completed in 597.4996058940887 seconds
+
+
+Total process completed in 612.6223220825195 seconds
+
+
+Process finished with exit code 0
