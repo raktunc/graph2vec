@@ -271,7 +271,6 @@ Event detection and evaluation completed in 0.04277300834655762 seconds
 
 Graph embedding started. Method: LDP
 
-
 Graph embedding LDP completed in 151.5423083305359 seconds
 
 

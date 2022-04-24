@@ -12,10 +12,12 @@ from scipy.spatial.distance import euclidean, cosine, minkowski, mahalanobis, br
     cityblock, correlation
 
 dataset_values_map = {
-    "BCS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\BigCentralSquare\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
-    "TGSM": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\Weighted\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
+    "RMV": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\Voice\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
+    "RMS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\RealityMining1\\SMS\\Directed_Graph\\Unweighted\\Graph", "ground_truth": [6, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 27, 31, 32, 34, 35]},
+    "ENRON": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\Enron1\\Graph", "ground_truth": [34, 42, 45, 56, 62, 73, 81]},
+    "CS": {"input_path": "C:\\Users\\v-riaktu\\IdeaProjects\\cdr-event-detection\\input_data\\AVEA1\\CentralSquare\\Graph", "ground_truth": [2, 3, 4, 5, 6, 11, 16, 17, 18, 22, 24, 25, 29, 30]},
 }
-embedding_methods = ["Graph2Vec"]
+embedding_methods = ["Graph2Vec", "LDP", "FeatherGraph"]
 distance_methods = ['euclidian', 'cosine', 'minkowski', 'mahalanobis', 'braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation']
 
 def main():
@@ -27,7 +29,7 @@ def main():
         average_precisions_all_methods = run_experiment(key, graph_files, value["ground_truth"])
         average_precisions_all_methods_all_datasets = merge_dictionary(average_precisions_all_methods, average_precisions_all_methods_all_datasets)
 
-    pd.DataFrame(average_precisions_all_methods_all_datasets).to_csv("results/averagePrecisions.csv", index=False)
+    pd.DataFrame(average_precisions_all_methods_all_datasets).to_csv("results/averagePrecisionsLineGraph.csv", index=False)
     print("\nTotal process completed in %s seconds\n" % (time.time() - process_start_time))
 
 
@@ -69,7 +71,7 @@ def get_graph_files(input_path):
 def compute_graph_embeddings(output_path, embedding_method, graph_files):
     print("\nGraph embedding started. Method: " + embedding_method + "\n")
     start_time = time.time()
-    graphs = list(map(get_nx_graph_from_file, graph_files))
+    graphs = list(map(get_nx_line_graph_from_file, graph_files))
     embedding_model = Graph2Vec()
     if embedding_method == "Graph2Vec":
         embedding_model = Graph2Vec()
@@ -112,13 +114,23 @@ def detect_events_and_evaluate(dataset, embedding_method, output_path, ground_tr
     average_precisions_initial = compute_average_precisions(dataset, embedding_method, "initial", events_map_initial, ground_truth)
     average_precisions_mean = compute_average_precisions(dataset, embedding_method, "mean", events_map_mean, ground_truth)
     average_precisions = merge_dictionary(average_precisions_initial, average_precisions_mean)
-    pd.DataFrame(average_precisions).to_csv(output_path + "/averagePrecisions.csv", index=False)
+    # pd.DataFrame(average_precisions).to_csv(output_path + "/averagePrecisions.csv", index=False)
     # print("\nEvent detection and evaluation completed in %s seconds\n" % (time.time() - start_time))
     return average_precisions
 
 
 def get_nx_graph_from_file(path):
     return nx.read_edgelist(path, nodetype=int, data=(("weight", int),), create_using=nx.DiGraph)
+
+
+def get_nx_line_graph_from_file(path):
+    graph = nx.line_graph(get_nx_graph_from_file(path))
+    node_mapper = {node: i for i, node in enumerate(graph.nodes())}
+    edges = [[node_mapper[edge[0]], node_mapper[edge[1]]] for edge in graph.edges()]
+    for key, value in node_mapper.items():
+        edges.append([value, value])
+    line_graph = nx.from_edgelist(edges)
+    return line_graph
 
 
 def compute_distances(vectors, reference, inv_cov, output_path):

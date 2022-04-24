@@ -1,5 +1,0 @@
-dataset,embedding_method,reference_vector,euclidian,cosine,minkowski,mahalanobis,braycurtis,canberra,chebyshev,cityblock,correlation
-BCS,Graph2Vec,mean,0.59,0.53,0.65,0.0,0.57,0.55,0.41,0.65,0.53
-BCS,Graph2Vec,initial,0.46,0.44,0.48,0.0,0.46,0.48,0.38,0.48,0.43
-TGSM,Graph2Vec,mean,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
-TGSM,Graph2Vec,initial,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
